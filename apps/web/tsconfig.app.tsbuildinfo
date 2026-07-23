@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/api.ts","./src/main.tsx","./src/participantView.ts","./src/components/CallRoom.tsx","./src/components/JoinForm.tsx","./src/test/JoinForm.test.tsx","./src/test/api.test.ts","./src/test/participantView.test.ts","./src/test/setup.ts","./vite.config.ts"],"version":"5.9.3"}
