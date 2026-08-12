@@ -5,6 +5,8 @@ export type GeminiSessionOptions = {
   model: string;
   voice: string;
   temperature: number;
+  inputAudioTranscription: Record<string, never>;
+  outputAudioTranscription: Record<string, never>;
 };
 
 export function createSessionOptions(
@@ -15,5 +17,7 @@ export function createSessionOptions(
     model: config.model,
     voice: config.voice,
     temperature: 0.7,
+    inputAudioTranscription: {},
+    outputAudioTranscription: {},
   };
 }

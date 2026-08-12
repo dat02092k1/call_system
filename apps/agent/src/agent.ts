@@ -1,4 +1,5 @@
 import {
+  AgentSessionEventTypes,
   ServerOptions,
   cli,
   defineAgent,
@@ -7,6 +8,7 @@ import {
   voice,
 } from "@livekit/agents";
 import * as google from "@livekit/agents-plugin-google";
+import { SipClient } from "livekit-server-sdk";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.js";
 import {
@@ -18,10 +20,20 @@ import {
   prepareInboundCallContext,
 } from "./orchestrator.js";
 import { createSessionOptions } from "./session.js";
+import {
+  createTransferToAgentTool,
+  toLiveKitHttpUrl,
+} from "./transfer.js";
+import { createTranscriptLogHandlers } from "./transcript.js";
 
 const config = loadConfig();
 const callOrchestrator = createCallOrchestratorClient(
   config.callOrchestratorUrl,
+);
+const sipClient = new SipClient(
+  toLiveKitHttpUrl(config.livekitUrl),
+  config.livekitApiKey,
+  config.livekitApiSecret,
 );
 
 export default defineAgent({
@@ -35,16 +47,47 @@ export default defineAgent({
       },
       callOrchestrator,
     );
+    const sipCallId = participant.attributes["sip.callID"];
+    const roomName = context.room.name;
+    const tools = sipCallId && roomName
+      ? [
+          createTransferToAgentTool({
+            call: {
+              callId: sipCallId,
+              phoneNumber:
+                participant.attributes["sip.phoneNumber"] ||
+                participant.identity,
+              roomName,
+              participantIdentity: participant.identity,
+            },
+            orchestrator: callOrchestrator,
+            sip: sipClient,
+          }),
+        ]
+      : [];
 
     const session = new voice.AgentSession({
       llm: new google.realtime.RealtimeModel(
         createSessionOptions(config),
       ),
     });
+    const transcriptHandlers = createTranscriptLogHandlers({
+      callId: sipCallId || participant.identity,
+      roomName: roomName || "unknown-room",
+    });
+    session.on(
+      AgentSessionEventTypes.UserInputTranscribed,
+      transcriptHandlers.onUserInputTranscribed,
+    );
+    session.on(
+      AgentSessionEventTypes.ConversationItemAdded,
+      transcriptHandlers.onConversationItemAdded,
+    );
 
     await session.start({
       agent: new voice.Agent({
         instructions: createAgentInstructions(customerContext),
+        tools,
       }),
       room: context.room,
     });

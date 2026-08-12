@@ -67,4 +67,38 @@ describe("call orchestrator mock API", () => {
       error: "callId, phoneNumber and direction are required",
     });
   });
+
+  it("returns the fixed demo CTV destination", async () => {
+    const baseUrl = await startServer();
+    const response = await fetch(`${baseUrl}/api/transfer-target`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        callId: "SCL_demo",
+        phoneNumber: "0901234567",
+        reason: "Khach hang can CTV ho tro",
+      }),
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      available: true,
+      transferTo: "sip:2001@127.0.0.1:5092",
+      agentName: "CTV Demo",
+    });
+  });
+
+  it("rejects a transfer request without a reason", async () => {
+    const baseUrl = await startServer();
+    const response = await fetch(`${baseUrl}/api/transfer-target`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ callId: "SCL_demo", phoneNumber: "0901234567" }),
+    });
+
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), {
+      error: "callId, phoneNumber and reason are required",
+    });
+  });
 });

@@ -61,6 +61,42 @@ export function createCallOrchestratorServer() {
       return;
     }
 
+    if (
+      request.method === "POST" &&
+      request.url === "/api/transfer-target"
+    ) {
+      try {
+        const body = await readJsonBody(request);
+        const callId = body?.callId?.trim();
+        const phoneNumber = body?.phoneNumber?.trim();
+        const reason = body?.reason?.trim();
+
+        if (!callId || !phoneNumber || !reason) {
+          sendJson(response, 400, {
+            error: "callId, phoneNumber and reason are required",
+          });
+          return;
+        }
+
+        console.log(
+          JSON.stringify({
+            event: "transfer-target-selected",
+            callId,
+            phoneNumber,
+            reason,
+          }),
+        );
+        sendJson(response, 200, {
+          available: true,
+          transferTo: "sip:2001@127.0.0.1:5092",
+          agentName: "CTV Demo",
+        });
+      } catch {
+        sendJson(response, 400, { error: "invalid JSON request body" });
+      }
+      return;
+    }
+
     sendJson(response, 404, { error: "not found" });
   });
 }

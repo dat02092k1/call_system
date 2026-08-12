@@ -385,6 +385,44 @@ Call Orchestrator mock:
 docker run --rm -v "${PWD}:/workspace" -w /workspace/apps/call-orchestrator node:22-alpine npm test
 ```
 
+## Demo cold transfer sang CTV
+
+Agent cung cấp function tool `transfer_to_agent`. Gemini chỉ truyền lý do chuyển;
+đích chuyển không nằm trong tham số của LLM. Agent gọi
+`POST /api/transfer-target` tới Call Orchestrator, sau đó dùng LiveKit
+`TransferSIPParticipant` để gửi SIP REFER.
+
+Đích cố định của mock hiện tại:
+
+```text
+sip:2001@127.0.0.1:5092
+```
+
+Chuẩn bị hai softphone độc lập trên Windows:
+
+1. Softphone khách hàng: Local Account, TCP, Source Port `5090`.
+2. Softphone CTV: Local Account, TCP, Source Port `5092`, bật nhận cuộc gọi.
+3. Nếu MicroSIP không cho mở hai tiến trình chung một cấu hình, dùng hai bản
+   portable ở hai thư mục riêng hoặc dùng một softphone khác cho phía CTV.
+4. Rebuild hai service vừa thay đổi:
+
+```powershell
+docker compose up -d --build call-orchestrator agent
+docker compose logs -f sip agent call-orchestrator
+```
+
+Từ softphone khách hàng, gọi `1000@127.0.0.1:5070`. Sau khi bot trả lời, nói:
+`Tôi cần gặp cộng tác viên để được hỗ trợ trực tiếp.` Bot phải hỏi xác nhận.
+Trả lời: `Đồng ý, hãy chuyển giúp tôi.`
+
+Khi Gemini gọi tool, log Call Orchestrator xuất hiện event
+`transfer-target-selected` và softphone CTV ở port `5092` sẽ đổ chuông. Nếu tool
+trả `unavailable` hoặc `failed`, bot tiếp tục hỗ trợ và không khẳng định đã chuyển.
+
+> Cold transfer phụ thuộc endpoint/tổng đài phía cuộc gọi đến hỗ trợ SIP REFER.
+> Khi lên production, thay URI local trong Call Orchestrator bằng extension hoặc
+> SIP URI do hệ thống phân phối CTV lựa chọn; không để LLM tự sinh destination.
+
 ## Giới hạn của bản local
 
 Hệ thống dùng LiveKit development credentials cố định, SIP trunk local không có authentication, kết nối `ws://` không mã hóa và chưa có xác thực người dùng. Không expose stack này ra Internet.

@@ -4,6 +4,48 @@ import {
   prepareInboundCallContext,
 } from "../src/orchestrator.js";
 
+describe("transfer target client", () => {
+  it("requests a destination without allowing the LLM to choose it", async () => {
+    const fetchImplementation = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          available: true,
+          transferTo: "sip:2001@127.0.0.1:5092",
+          agentName: "CTV Demo",
+        }),
+        { status: 200 },
+      ),
+    );
+    const client = createCallOrchestratorClient(
+      "http://call-orchestrator:3002",
+      fetchImplementation,
+    );
+
+    await expect(
+      client.getTransferTarget({
+        callId: "SCL_demo",
+        phoneNumber: "0901234567",
+        reason: "Khach hang can CTV ho tro",
+      }),
+    ).resolves.toEqual({
+      available: true,
+      transferTo: "sip:2001@127.0.0.1:5092",
+      agentName: "CTV Demo",
+    });
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      "http://call-orchestrator:3002/api/transfer-target",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          callId: "SCL_demo",
+          phoneNumber: "0901234567",
+          reason: "Khach hang can CTV ho tro",
+        }),
+      }),
+    );
+  });
+});
+
 describe("call orchestrator client", () => {
   it("posts SIP call information and returns customer context", async () => {
     const fetchImplementation = vi.fn().mockResolvedValue(
