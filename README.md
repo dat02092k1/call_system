@@ -423,6 +423,36 @@ trả `unavailable` hoặc `failed`, bot tiếp tục hỗ trợ và không kh�
 > Khi lên production, thay URI local trong Call Orchestrator bằng extension hoặc
 > SIP URI do hệ thống phân phối CTV lựa chọn; không để LLM tự sinh destination.
 
+## Ghi âm cuộc gọi
+
+Service `livekit/egress` dùng chung Redis với LiveKit Server và tự ghi toàn bộ
+audio trong room, bao gồm cả người gọi và bot. Agent bắt đầu Room Composite
+Egress trước khi phát lời chào Gemini. Khi room kết thúc, Egress hoàn tất file
+MP3 và lưu qua Docker bind mount vào:
+
+```text
+./recordings/{room-name}-{timestamp}.mp3
+```
+
+Khởi động hoặc rebuild phần ghi âm:
+
+```powershell
+docker compose up -d --build egress agent
+docker compose logs -f egress agent
+```
+
+Sau đó thực hiện một cuộc gọi bình thường tới `1000@127.0.0.1:5070`, nói chuyện
+với bot và kết thúc cuộc gọi. Kiểm tra file:
+
+```powershell
+Get-ChildItem .\recordings\*.mp3
+```
+
+Trong log Agent phải có `[recording] started` và `egressId`. Nếu Egress lỗi,
+Agent ghi `[recording] failed to start` nhưng vẫn tiếp tục phục vụ cuộc gọi.
+Thư mục local này phù hợp cho demo; production nên cấu hình Egress upload lên
+MinIO/S3 hoặc object storage tương đương.
+
 ## Giới hạn của bản local
 
 Hệ thống dùng LiveKit development credentials cố định, SIP trunk local không có authentication, kết nối `ws://` không mã hóa và chưa có xác thực người dùng. Không expose stack này ra Internet.

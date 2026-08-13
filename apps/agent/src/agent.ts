@@ -8,7 +8,7 @@ import {
   voice,
 } from "@livekit/agents";
 import * as google from "@livekit/agents-plugin-google";
-import { SipClient } from "livekit-server-sdk";
+import { EgressClient, SipClient } from "livekit-server-sdk";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.js";
 import {
@@ -20,6 +20,7 @@ import {
   prepareInboundCallContext,
 } from "./orchestrator.js";
 import { createSessionOptions } from "./session.js";
+import { startRoomAudioRecording } from "./recording.js";
 import {
   createTransferToAgentTool,
   toLiveKitHttpUrl,
@@ -35,10 +36,33 @@ const sipClient = new SipClient(
   config.livekitApiKey,
   config.livekitApiSecret,
 );
+const egressClient = new EgressClient(
+  toLiveKitHttpUrl(config.livekitUrl),
+  config.livekitApiKey,
+  config.livekitApiSecret,
+);
 
 export default defineAgent({
   entry: async (context: JobContext) => {
     await context.connect();
+    const roomName = context.room.name;
+    if (roomName) {
+      try {
+        const recording = await startRoomAudioRecording(
+          roomName,
+          egressClient,
+        );
+        console.info("[recording] started", {
+          roomName,
+          egressId: recording.egressId,
+        });
+      } catch (error) {
+        console.error("[recording] failed to start", {
+          roomName,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
     const participant = await context.waitForParticipant();
     const customerContext = await prepareInboundCallContext(
       {
@@ -48,7 +72,6 @@ export default defineAgent({
       callOrchestrator,
     );
     const sipCallId = participant.attributes["sip.callID"];
-    const roomName = context.room.name;
     const tools = sipCallId && roomName
       ? [
           createTransferToAgentTool({
