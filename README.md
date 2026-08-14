@@ -71,7 +71,7 @@ sequenceDiagram
     participant O as Call Orchestrator
     participant G as Gemini Live
 
-    U->>B: Nhập tên, room và nhấn Join
+    U->>B: Nhập tên và nhấn Gọi tổng đài
     B->>T: POST /api/token
     T-->>B: Access token + LiveKit URL
     B->>L: Connect bằng access token
@@ -247,15 +247,16 @@ Log `registered worker` nghĩa là agent đã kết nối và đăng ký với L
 ## Test cuộc gọi bằng trình duyệt
 
 1. Mở [http://localhost:5173](http://localhost:5173).
-2. Nhập tên, ví dụ `User A`.
-3. Nhập một room mới, ví dụ `gemini-test-01`.
-4. Nhấn **Join call** và cho phép trình duyệt sử dụng microphone.
+2. Nhập tên, ví dụ `Nguyễn Văn A`.
+3. Nhấn **Gọi tổng đài** và cho phép trình duyệt sử dụng microphone.
+4. Frontend tự tạo room riêng có prefix `web-call-`; người dùng không cần nhập
+   room kỹ thuật.
 5. Chờ participant **Trợ lý AI** có nhãn **AI** xuất hiện.
 6. Nghe lời chào, sau đó thử nói: `Xin chào, bạn có nghe thấy tôi không?`
-7. Thử hỏi tiếp: `Hãy giới thiệu ngắn gọn về LiveKit.`
-8. Nhấn **Leave** để kết thúc.
+7. Nhấn **Kết thúc** để đóng cuộc gọi.
 
-Nên dùng room mới cho mỗi lần test vì bản demo local sử dụng automatic dispatch khi room được tạo.
+Đây là addon WebRTC kết nối trực tiếp vào LiveKit Server. Luồng MicroSIP/SIP
+bên dưới vẫn giữ nguyên và tiếp tục đi qua LiveKit SIP tại port `5070`.
 
 ## Test cuộc gọi bằng softphone
 
@@ -325,7 +326,7 @@ Trên Docker Desktop/Windows, hãy chọn transport **TCP** cho SIP signaling. R
 | `sip-bootstrap` exit khác `0` | Redis/LiveKit chưa sẵn sàng hoặc trunk/rule không hợp lệ | `docker compose logs sip-bootstrap livekit` |
 | Agent không xuất hiện | Agent chưa chạy hoặc chưa đăng ký với LiveKit | `docker compose ps agent` và `docker compose logs agent` |
 | Agent vào room nhưng không nói | Google key sai, hết quota hoặc Gemini Live không khả dụng | Tìm lỗi Gemini trong `docker compose logs agent` |
-| UI báo chờ Agent quá lâu | Đang dùng room cũ hoặc agent khởi động sau khi room được tạo | Leave và join lại bằng một room mới |
+| UI báo chờ Agent quá lâu | Agent chưa đăng ký hoặc khởi động sau khi room được tạo | Kết thúc, kiểm tra `docker compose logs agent` rồi gọi lại |
 | Không thu được tiếng | Trình duyệt chưa được cấp quyền microphone | Kiểm tra quyền microphone cạnh thanh địa chỉ |
 | Không nghe được bot | Tab bị mute, sai thiết bị output hoặc autoplay bị chặn | Kiểm tra loa, volume và quyền phát audio của tab |
 | Web không mở được | Container web/token API chưa healthy | `docker compose ps` và `docker compose logs web token-api` |

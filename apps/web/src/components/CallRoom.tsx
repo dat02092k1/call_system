@@ -133,9 +133,9 @@ export function CallRoom({
         <header className="call-header">
           <div className="brand">
             <span className="brand-mark" aria-hidden="true">
-              L
+              T
             </span>
-            Local line
+            TCBS Voice
           </div>
           <div className={`connection-pill ${isConnected ? "online" : ""}`}>
             <span />
@@ -145,8 +145,8 @@ export function CallRoom({
 
         <section className="room-heading">
           <div>
-            <p className="eyebrow">Audio room</p>
-            <h1>{session.roomName}</h1>
+            <p className="eyebrow">Cuộc gọi WebRTC</p>
+            <h1>Đang kết nối tổng đài</h1>
           </div>
           <div className="room-status">
             <p>
@@ -203,7 +203,7 @@ export function CallRoom({
             type="button"
           >
             <MicrophoneIcon off={muted} />
-            <span>{muted ? "Unmute" : "Mute"}</span>
+            <span>{muted ? "Bật mic" : "Tắt mic"}</span>
           </button>
           <button
             className="control-button leave-button"
@@ -212,7 +212,7 @@ export function CallRoom({
             type="button"
           >
             <PhoneIcon />
-            <span>Leave</span>
+            <span>Kết thúc</span>
           </button>
         </div>
         <RoomAudioRenderer />
