@@ -8,16 +8,21 @@ export type CallDetails = {
 
 type JoinFormProps = {
   onJoin: (details: CallDetails) => Promise<void> | void;
+  onAsteriskCall: (details: CallDetails) => Promise<void> | void;
   busy: boolean;
   error: string;
 };
 
-export function JoinForm({ onJoin, busy, error }: JoinFormProps) {
+export function JoinForm({
+  onJoin,
+  onAsteriskCall,
+  busy,
+  error,
+}: JoinFormProps) {
   const [displayName, setDisplayName] = useState("");
   const [displayError, setDisplayError] = useState("");
 
-  async function submit(event: FormEvent) {
-    event.preventDefault();
+  function callDetails(): CallDetails | undefined {
     const normalizedDisplayName = displayName.trim();
     const nextDisplayError =
       normalizedDisplayName.length < 1
@@ -27,12 +32,22 @@ export function JoinForm({ onJoin, busy, error }: JoinFormProps) {
           : "";
     setDisplayError(nextDisplayError);
 
-    if (!nextDisplayError) {
-      await onJoin({
-        displayName: normalizedDisplayName,
-        roomName: createWebCallRoomName(),
-      });
-    }
+    if (nextDisplayError) return undefined;
+    return {
+      displayName: normalizedDisplayName,
+      roomName: createWebCallRoomName(),
+    };
+  }
+
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    const details = callDetails();
+    if (details) await onJoin(details);
+  }
+
+  async function callAsterisk() {
+    const details = callDetails();
+    if (details) await onAsteriskCall(details);
   }
 
   return (
@@ -71,9 +86,19 @@ export function JoinForm({ onJoin, busy, error }: JoinFormProps) {
               {error}
             </p>
           )}
-          <button className="primary-button" disabled={busy} type="submit">
-            {busy ? "Đang kết nối…" : "Gọi tổng đài"}
-          </button>
+          <div className="call-mode-buttons">
+            <button className="primary-button" disabled={busy} type="submit">
+              {busy ? "Đang kết nối…" : "Gọi trực tiếp WebRTC"}
+            </button>
+            <button
+              className="secondary-button"
+              disabled={busy}
+              type="button"
+              onClick={callAsterisk}
+            >
+              Gọi qua Asterisk Mock
+            </button>
+          </div>
         </form>
         <p className="privacy-note">
           <span aria-hidden="true">●</span> Cuộc gọi được xử lý qua LiveKit

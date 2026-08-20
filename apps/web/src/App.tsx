@@ -5,9 +5,11 @@ import {
   type CallDetails,
 } from "./components/JoinForm";
 import { CallRoom } from "./components/CallRoom";
+import { AsteriskCall } from "./components/AsteriskCall";
 
 export function App() {
   const [session, setSession] = useState<TokenResponse | null>(null);
+  const [asteriskCaller, setAsteriskCaller] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -40,5 +42,24 @@ export function App() {
     );
   }
 
-  return <JoinForm onJoin={join} busy={busy} error={error} />;
+  if (asteriskCaller) {
+    return (
+      <AsteriskCall
+        displayName={asteriskCaller}
+        onLeave={() => setAsteriskCaller(null)}
+      />
+    );
+  }
+
+  return (
+    <JoinForm
+      onJoin={join}
+      onAsteriskCall={(details) => {
+        setError("");
+        setAsteriskCaller(details.displayName);
+      }}
+      busy={busy}
+      error={error}
+    />
+  );
 }
