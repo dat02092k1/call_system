@@ -107,14 +107,26 @@ export type SipParticipantInfo = {
   attributes: Record<string, string>;
 };
 
+export function resolveInboundCallIdentity(
+  participant: SipParticipantInfo,
+): { callId: string; phoneNumber: string } {
+  return {
+    callId:
+      participant.attributes["sip.callID"] ||
+      participant.attributes["telephony.callId"] ||
+      `call-${participant.identity}`,
+    phoneNumber:
+      participant.attributes["sip.phoneNumber"] ||
+      participant.attributes["telephony.phoneNumber"] ||
+      participant.identity,
+  };
+}
+
 export async function prepareInboundCallContext(
   participant: SipParticipantInfo,
   client: Pick<CallOrchestratorClient, "getCallContext">,
 ): Promise<CustomerCallContext> {
-  const callId =
-    participant.attributes["sip.callID"] || `call-${participant.identity}`;
-  const phoneNumber =
-    participant.attributes["sip.phoneNumber"] || participant.identity;
+  const { callId, phoneNumber } = resolveInboundCallIdentity(participant);
 
   try {
     return await client.getCallContext({
