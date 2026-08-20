@@ -159,16 +159,75 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  voice-bridge:
+    build:
+      context: ./apps/voice-bridge
+    environment:
+      LIVEKIT_URL: ws://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:-secret}
+      VOICE_BRIDGE_PORT: 8091
+      MEDIA_START_TIMEOUT_MS: 5000
+      AGENT_START_TIMEOUT_MS: 20000
+      MAX_AUDIO_BUFFER_MS: 500
+    ports:
+      - "8091:8091"
+    depends_on:
+      livekit:
+        condition: service_started
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:8091/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  mock-asterisk:
+    build:
+      context: ./apps/mock-asterisk
+    environment:
+      PORT: 8090
+      VOICE_BRIDGE_URL: ws://voice-bridge:8091/media
+      CALL_START_TIMEOUT_MS: 5000
+    ports:
+      - "8090:8090"
+    depends_on:
+      voice-bridge:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:8090/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 3s
+    restart: unless-stopped
+
   web:
     build:
       context: ./apps/web
     environment:
       VITE_TOKEN_API_URL: ${VITE_TOKEN_API_URL:-http://localhost:3001}
       VITE_LIVEKIT_URL: ${VITE_LIVEKIT_URL:-ws://localhost:7880}
+      VITE_MOCK_ASTERISK_URL: ${VITE_MOCK_ASTERISK_URL:-ws://localhost:8090/call}
     ports:
       - "5173:5173"
     depends_on:
       token-api:
+        condition: service_healthy
+      mock-asterisk:
         condition: service_healthy
     healthcheck:
       test:
