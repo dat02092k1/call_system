@@ -1,0 +1,20 @@
+{
+  "name": "livekit-mock-asterisk",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/src/server.js",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.30",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}
