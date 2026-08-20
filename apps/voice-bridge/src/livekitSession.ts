@@ -37,6 +37,43 @@ export type RtcCallAdapter = {
   disconnect(): Promise<void>;
 };
 
+export type CancellableStreamReader = {
+  done: Promise<void>;
+  cancel(): Promise<void>;
+};
+
+export function startCancellableStreamReader<T>(
+  stream: ReadableStream<T>,
+  onValue: (value: T) => void,
+): CancellableStreamReader {
+  const reader = stream.getReader();
+  let finished = false;
+  const done = (async () => {
+    try {
+      for (;;) {
+        const result = await reader.read();
+        if (result.done) {
+          return;
+        }
+        onValue(result.value);
+      }
+    } finally {
+      finished = true;
+      reader.releaseLock();
+    }
+  })();
+
+  return {
+    done,
+    async cancel() {
+      if (!finished) {
+        await reader.cancel();
+      }
+      await done;
+    },
+  };
+}
+
 type SessionOptions = {
   start: MediaStartEvent;
   config: VoiceBridgeConfig;
@@ -217,7 +254,7 @@ class NativeRtcCallAdapter implements RtcCallAdapter {
   private readonly room = new Room();
   private source?: AudioSource;
   private callerTrack?: LocalAudioTrack;
-  private agentStream?: AudioStream;
+  private agentReader?: CancellableStreamReader;
   private agentFrameHandler: (samples: Int16Array) => void = () => undefined;
   private disconnectedHandler: () => void = () => undefined;
   private disconnecting = false;
@@ -290,24 +327,29 @@ class NativeRtcCallAdapter implements RtcCallAdapter {
       return;
     }
     this.disconnecting = true;
-    await this.agentStream?.cancel();
+    await this.agentReader?.cancel();
+    this.agentReader = undefined;
     await this.callerTrack?.close();
     await this.room.disconnect();
   }
 
   private async consumeAgentTrack(track: RemoteAudioTrack): Promise<void> {
-    await this.agentStream?.cancel();
+    await this.agentReader?.cancel();
     const stream = new AudioStream(track, {
       sampleRate: 16_000,
       numChannels: 1,
       frameSizeMs: 20,
     });
-    this.agentStream = stream;
-    for await (const frame of stream) {
-      if (this.disconnecting || this.agentStream !== stream) {
-        return;
+    let activeReader: CancellableStreamReader;
+    activeReader = startCancellableStreamReader(stream, (frame) => {
+      if (!this.disconnecting && this.agentReader === activeReader) {
+        this.agentFrameHandler(frame.data.slice());
       }
-      this.agentFrameHandler(frame.data.slice());
+    });
+    this.agentReader = activeReader;
+    await activeReader.done;
+    if (this.agentReader === activeReader) {
+      this.agentReader = undefined;
     }
   }
 }

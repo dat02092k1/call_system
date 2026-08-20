@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { VoiceBridgeConfig } from "../src/config.js";
 import {
   LiveKitCallSession,
+  startCancellableStreamReader,
   type RtcCallAdapter,
   type RtcConnectInput,
 } from "../src/livekitSession.js";
@@ -77,6 +78,32 @@ async function eventually(assertion: () => void) {
   }
   assertion();
 }
+
+describe("startCancellableStreamReader", () => {
+  it("cancels a locked stream through its active reader", async () => {
+    let cancelCount = 0;
+    const received: number[][] = [];
+    const stream = new ReadableStream<Int16Array>({
+      start(controller) {
+        controller.enqueue(new Int16Array([1, -1]));
+      },
+      cancel() {
+        cancelCount += 1;
+      },
+    });
+
+    const activeReader = startCancellableStreamReader(stream, (samples) => {
+      received.push(Array.from(samples));
+    });
+
+    await eventually(() => expect(received).toEqual([[1, -1]]));
+    await expect(activeReader.cancel()).resolves.toBeUndefined();
+    await activeReader.done;
+
+    expect(cancelCount).toBe(1);
+    expect(stream.locked).toBe(false);
+  });
+});
 
 describe("LiveKitCallSession", () => {
   it("joins a deterministic room with telephony metadata", async () => {
