@@ -1,6 +1,6 @@
 # LiveKit Gemini Callbot chạy local
 
-Demo trợ lý giọng nói tiếng Việt sử dụng LiveKit và Gemini Live. Người dùng có thể vào hệ thống bằng trình duyệt/WebRTC hoặc softphone/SIP. Web, Token API, Call Orchestrator Mock, Redis, LiveKit Server, LiveKit SIP và Agent Worker chạy bằng Docker Compose; chỉ Gemini Live API nằm bên ngoài máy local.
+Demo trợ lý giọng nói tiếng Việt sử dụng LiveKit và Gemini Live Speech-to-Speech. Người dùng có thể vào hệ thống bằng trình duyệt/WebRTC, softphone/LiveKit SIP hoặc luồng Asterisk WebSocket Media. Toàn bộ hạ tầng demo chạy bằng Docker Compose; chỉ Gemini Live API nằm bên ngoài máy local.
 
 ## Kiến trúc tổng quan
 
@@ -16,6 +16,8 @@ flowchart LR
         T["Token API<br/>Node.js + Express<br/>localhost:3001"]
         R[("Redis<br/>localhost:6379")]
         P["LiveKit SIP<br/>SIP 5070<br/>RTP 10000-10100"]
+        X["Mock Asterisk<br/>WebSocket :8090"]
+        V["Voice Bridge<br/>PCM16 WebSocket :8091"]
         L["LiveKit Server<br/>Room + Signaling + Media<br/>localhost:7880-7882"]
         A["Agent Worker<br/>LiveKit Agents<br/>localhost:8081"]
         O["Call Orchestrator Mock<br/>Business context API<br/>localhost:3002"]
@@ -27,7 +29,10 @@ flowchart LR
     B -->|"POST /api/token"| T
     T -->|"LiveKit access token"| B
     B <-->|"WebSocket + WebRTC audio"| L
+    B <-->|"PCM16 audio + call control"| X
     S <-->|"SIP INVITE/BYE + RTP audio"| P
+    X <-->|"Asterisk WebSocket Media<br/>slin16 + events"| V
+    V <-->|"LiveKit RTC audio tracks"| L
     P <-->|"SIP participant + audio"| L
     P <-->|"Trunk, dispatch, session state"| R
     L <-->|"Room state + message bus"| R
@@ -37,10 +42,11 @@ flowchart LR
     A <-->|"Realtime audio + phản hồi"| G
 ```
 
-Ba luồng dữ liệu chính:
+Bốn luồng dữ liệu chính:
 
 - **Browser control/signaling:** trình duyệt lấy access token, kết nối room và LiveKit dispatch Agent Worker.
 - **SIP control/signaling:** softphone gửi `INVITE` tới LiveKit SIP; trunk và dispatch rule tạo room/SIP participant.
+- **Asterisk WebSocket Media:** trình duyệt demo gửi PCM16 tới Mock Asterisk; Mock chuyển media/event tới Voice Bridge, rồi Voice Bridge tham gia LiveKit room như caller. Khi dùng Asterisk thật, Asterisk thay thế Mock nhưng Voice Bridge và phần còn lại giữ nguyên.
 - **Audio realtime:** microphone → LiveKit → Agent Worker → Gemini; audio trả lời đi ngược lại tới loa. Với SIP, LiveKit SIP chuyển đổi RTP thành track trong room.
 
 `GOOGLE_API_KEY` và LiveKit API secret chỉ tồn tại ở backend/container, không được gửi xuống trình duyệt.
@@ -53,6 +59,8 @@ Ba luồng dữ liệu chính:
 | Token API | Kiểm tra tên/room và ký LiveKit access token | `POST /api/token`, `GET /health` | `3001` |
 | Redis | Lưu SIP trunk, dispatch rule, session state và làm message bus cho LiveKit | Redis protocol | `6379` |
 | LiveKit SIP | Nhận SIP call, xử lý RTP và tạo SIP participant trong room | SIP UDP/TCP, RTP UDP, Redis | `5070`, `10000-10100/udp` |
+| Mock Asterisk | Mô phỏng Asterisk WebSocket Media để test từ browser mà không cần cài PBX | WebSocket browser `/call`; WebSocket Media tới Voice Bridge | `8090` |
+| Voice Bridge | Ánh xạ call thành room/participant; chuyển PCM16 hai chiều giữa Asterisk và LiveKit | WebSocket `/media`; LiveKit RTC | `8091` |
 | LiveKit Server | Quản lý room, participant, signaling và chuyển tiếp audio | WebSocket, WebRTC TCP/UDP, agent dispatch | `7880`, `7881`, `7882/udp` |
 | Agent Worker | Nhận job, tham gia room với tên `Trợ lý AI`, điều phối Gemini realtime | LiveKit Agents và Gemini Live API | `8081` |
 | Call Orchestrator Mock | Nhận thông tin cuộc gọi và trả về context nghiệp vụ giả lập | `POST /api/call-context`, `GET /health` | `3002` |
@@ -71,7 +79,7 @@ sequenceDiagram
     participant O as Call Orchestrator
     participant G as Gemini Live
 
-    U->>B: Nhập tên và nhấn Gọi tổng đài
+    U->>B: Nhập tên và nhấn Gọi trực tiếp WebRTC
     B->>T: POST /api/token
     T-->>B: Access token + LiveKit URL
     B->>L: Connect bằng access token
@@ -103,6 +111,59 @@ sequenceDiagram
 ```
 
 Điểm quan trọng: trình duyệt không gọi Gemini trực tiếp. Agent Worker giữ API key, kết nối Gemini và xuất hiện trong LiveKit room như một participant.
+
+## Luồng Asterisk WebSocket Media
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor U as Người dùng
+    participant B as Trình duyệt
+    participant M as Mock Asterisk
+    participant V as Voice Bridge
+    participant L as LiveKit Server
+    participant A as Agent Worker
+    participant O as Call Orchestrator
+    participant G as Gemini Live S2S
+
+    U->>B: Nhập tên và nhấn Gọi qua Asterisk Mock
+    B->>M: WebSocket call.start
+    M->>V: Mở WebSocket /media
+    M->>V: MEDIA_START, slin16, caller metadata
+    V->>L: Join room và publish caller audio track
+    L->>A: Dispatch Agent job
+    A->>O: POST /api/call-context
+    O-->>A: nameCustomer = Nguyễn Văn A
+    A->>G: Mở Gemini Live native audio session
+    G-->>A: Audio lời chào
+    A-->>L: Publish bot audio track
+    L-->>V: Subscribe bot audio track
+    V-->>M: PCM16 audio
+    M-->>B: PCM16 audio
+    B-->>U: Phát qua loa
+
+    loop Hội thoại hai chiều
+        U->>B: Nói vào microphone
+        B->>M: PCM16 mono 16 kHz
+        M->>V: Binary PCM16
+        V->>L: Publish caller audio
+        L->>A: Caller audio track
+        A->>G: Realtime audio
+        G-->>A: Realtime response audio
+        A-->>L: Publish bot audio
+        L-->>V: Bot audio track
+        V-->>M: Binary PCM16
+        M-->>B: Binary PCM16
+        B-->>U: Phát qua loa
+    end
+
+    U->>B: Nhấn Kết thúc
+    B->>M: call.hangup
+    M->>V: Close media WebSocket
+    V->>L: Disconnect caller participant
+```
+
+`Mock Asterisk` chỉ mô phỏng biên WebSocket Media cho local demo. Khi tích hợp Asterisk thật, cấu hình `chan_websocket`/dialplan mở media session tới `wss://<voice-bridge>/media`, codec `slin16` (PCM16 little-endian, mono, 16 kHz). Không cần thay đổi Agent Worker hay Gemini. Bản v1 đảm bảo audio hai chiều và call lifecycle; transfer cho nhánh Asterisk được để lại cho giai đoạn có mô hình PBX cụ thể.
 
 ## Luồng cuộc gọi từ softphone
 
@@ -173,6 +234,8 @@ Softphone gọi trực tiếp SIP URI và không đăng ký extension. LiveKit S
 | `5173/tcp` | Web App |
 | `6379/tcp` | Redis |
 | `7880-7881/tcp`, `7882/udp` | LiveKit Server |
+| `8090/tcp` | Mock Asterisk browser WebSocket |
+| `8091/tcp` | Voice Bridge health + media WebSocket |
 | `5070/tcp,udp` | LiveKit SIP signaling |
 | `10000-10100/udp` | LiveKit SIP RTP |
 
@@ -207,7 +270,7 @@ docker compose up -d --build
 docker compose ps
 ```
 
-Các service `redis`, `web`, `token-api`, `call-orchestrator` và `agent` cần có trạng thái `healthy`; `livekit` và `sip` cần ở trạng thái `Up`. `sip-bootstrap` chạy một lần rồi phải có trạng thái `Exited (0)`.
+Các service `redis`, `web`, `token-api`, `call-orchestrator`, `voice-bridge`, `mock-asterisk` và `agent` cần có trạng thái `healthy`; `livekit`, `sip` và `egress` cần ở trạng thái `Up`. `sip-bootstrap` chạy một lần rồi phải có trạng thái `Exited (0)`.
 
 Lần chạy đầu tiên có thể mất vài phút vì Docker phải tải image và build các service.
 
@@ -219,6 +282,12 @@ Invoke-RestMethod http://127.0.0.1:3001/health
 
 # Call Orchestrator Mock
 Invoke-RestMethod http://127.0.0.1:3002/health
+
+# Mock Asterisk
+Invoke-RestMethod http://127.0.0.1:8090/health
+
+# Voice Bridge
+Invoke-RestMethod http://127.0.0.1:8091/health
 
 # Web App
 Invoke-WebRequest -UseBasicParsing http://127.0.0.1:5173
@@ -248,15 +317,21 @@ Log `registered worker` nghĩa là agent đã kết nối và đăng ký với L
 
 1. Mở [http://localhost:5173](http://localhost:5173).
 2. Nhập tên, ví dụ `Nguyễn Văn A`.
-3. Nhấn **Gọi tổng đài** và cho phép trình duyệt sử dụng microphone.
-4. Frontend tự tạo room riêng có prefix `web-call-`; người dùng không cần nhập
-   room kỹ thuật.
+3. Chọn một trong hai nút và cho phép trình duyệt sử dụng microphone:
+   - **Gọi trực tiếp WebRTC:** frontend tạo room có prefix `web-call-` và publish microphone trực tiếp vào LiveKit.
+   - **Gọi qua Asterisk Mock:** browser gửi PCM16 qua `ws://localhost:8090/call`; Voice Bridge tạo room có prefix `asterisk-`.
+4. Người dùng không cần nhập room kỹ thuật ở cả hai chế độ.
 5. Chờ participant **Trợ lý AI** có nhãn **AI** xuất hiện.
 6. Nghe lời chào, sau đó thử nói: `Xin chào, bạn có nghe thấy tôi không?`
 7. Nhấn **Kết thúc** để đóng cuộc gọi.
 
-Đây là addon WebRTC kết nối trực tiếp vào LiveKit Server. Luồng MicroSIP/SIP
-bên dưới vẫn giữ nguyên và tiếp tục đi qua LiveKit SIP tại port `5070`.
+Hai nút sử dụng hai đường media đầu vào khác nhau nhưng hội tụ tại LiveKit Server và dùng chung Agent Worker, Call Orchestrator, Gemini S2S và Egress. Luồng MicroSIP/SIP bên dưới vẫn giữ nguyên tại port `5070`.
+
+Để theo dõi riêng luồng Asterisk Mock:
+
+```powershell
+docker compose logs -f mock-asterisk voice-bridge livekit agent
+```
 
 ## Test cuộc gọi bằng softphone
 
@@ -330,6 +405,9 @@ Trên Docker Desktop/Windows, hãy chọn transport **TCP** cho SIP signaling. R
 | Không thu được tiếng | Trình duyệt chưa được cấp quyền microphone | Kiểm tra quyền microphone cạnh thanh địa chỉ |
 | Không nghe được bot | Tab bị mute, sai thiết bị output hoặc autoplay bị chặn | Kiểm tra loa, volume và quyền phát audio của tab |
 | Web không mở được | Container web/token API chưa healthy | `docker compose ps` và `docker compose logs web token-api` |
+| Nút Asterisk Mock báo không kết nối được | `mock-asterisk` hoặc `voice-bridge` chưa healthy, hoặc port `8090/8091` bị chiếm | `docker compose ps mock-asterisk voice-bridge` và xem log hai service |
+| Asterisk Mock kết nối nhưng không nghe bot | Agent/Gemini chưa phát audio hoặc bridge hết thời gian chờ | `docker compose logs agent voice-bridge`; kiểm tra Google key và `AGENT_START_TIMEOUT_MS` |
+| Voice Bridge báo sai `MEDIA_START` | Asterisk gửi codec/frame format khác hợp đồng demo | Dùng `slin16`, mono, 16 kHz, PCM16 little-endian; gửi `MEDIA_START` trước binary audio |
 
 ## Lệnh thường dùng
 
@@ -342,6 +420,9 @@ docker compose logs -f agent
 
 # Xem toàn bộ đường SIP
 docker compose logs -f sip agent call-orchestrator livekit
+
+# Xem toàn bộ đường Asterisk WebSocket Media
+docker compose logs -f mock-asterisk voice-bridge agent call-orchestrator livekit
 
 # Chạy lại bootstrap; resource hiện có sẽ được tái sử dụng
 docker compose run --rm sip-bootstrap
@@ -384,6 +465,18 @@ Call Orchestrator mock:
 
 ```powershell
 docker run --rm -v "${PWD}:/workspace" -w /workspace/apps/call-orchestrator node:22-alpine npm test
+```
+
+Voice Bridge (cần image glibc vì LiveKit RTC có native binding):
+
+```powershell
+docker run --rm -v "${PWD}:/workspace" -v /workspace/apps/voice-bridge/node_modules -w /workspace/apps/voice-bridge node:22-bookworm-slim sh -c "npm ci && npm test && npm run typecheck && npm run build"
+```
+
+Mock Asterisk:
+
+```powershell
+docker run --rm -v "${PWD}:/workspace" -v /workspace/apps/mock-asterisk/node_modules -w /workspace/apps/mock-asterisk node:22-alpine sh -c "npm ci && npm test && npm run typecheck && npm run build"
 ```
 
 ## Demo cold transfer sang CTV
@@ -458,7 +551,9 @@ MinIO/S3 hoặc object storage tương đương.
 
 Hệ thống dùng LiveKit development credentials cố định, SIP trunk local không có authentication, kết nối `ws://` không mã hóa và chưa có xác thực người dùng. Không expose stack này ra Internet.
 
-Demo SIP chỉ nhận direct call tới số `1000`; chưa có SIP provider, DID/PSTN, 3CX/Asterisk hoặc outbound calling.
+Demo SIP chỉ nhận direct call tới số `1000`; chưa có SIP provider, DID/PSTN hoặc outbound calling. Service `Mock Asterisk` mô phỏng giao thức media để kiểm thử end-to-end, không phải một PBX Asterisk đầy đủ và không xử lý SIP trunk/dialplan.
+
+Kết nối Mock Asterisk → Voice Bridge hiện dùng `ws://` trong Docker network. Production phải dùng `wss://`, xác thực/allowlist, timeout và giới hạn session; Asterisk thật chịu trách nhiệm SIP signaling, dialplan, codec negotiation và call events. Voice Bridge chỉ nhận PCM/event, ánh xạ session và đưa media vào LiveKit.
 
 `compose.yaml` hiện dùng tag `latest` cho LiveKit Server và LiveKit SIP. Điều này phù hợp với demo nhưng không đảm bảo build có thể tái lập trong tương lai. Trước khi dùng cho môi trường ổn định, hãy pin các image về phiên bản đã kiểm thử.
 
