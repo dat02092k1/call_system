@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import {
   normalizeLiveKitId,
@@ -6,6 +7,25 @@ import {
 } from "../src/protocol.js";
 
 describe("Asterisk media protocol", () => {
+  it("parses the native JSON emitted by Asterisk chan_websocket", async () => {
+    const payload = await readFile(
+      new URL("./fixtures/asterisk-media-start.json", import.meta.url),
+      "utf8",
+    );
+    expect(parseMediaControl(payload)).toEqual({
+      event: "MEDIA_START",
+      connectionId: "8f41dd0e-4c5a-4c43-ae2d-6f08d5b9ec31",
+      channelId: "1741a49a-9d4f-4fd5-8efe-49f3785a64a2",
+      format: "slin16",
+      optimalFrameSize: 640,
+      ptime: 20,
+      channelVariables: {
+        CALLERID_NUM: "2001",
+        EXTEN: "1000",
+      },
+    });
+  });
+
   it("parses a valid slin16 MEDIA_START event", () => {
     expect(
       parseMediaControl(

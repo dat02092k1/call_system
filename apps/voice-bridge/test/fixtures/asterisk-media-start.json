@@ -1,0 +1,13 @@
+{
+  "event": "MEDIA_START",
+  "connection_id": "8f41dd0e-4c5a-4c43-ae2d-6f08d5b9ec31",
+  "channel_id": "1741a49a-9d4f-4fd5-8efe-49f3785a64a2",
+  "channel": "WebSocket/voicebridge-00000001",
+  "format": "slin16",
+  "optimal_frame_size": 640,
+  "ptime": 20,
+  "channel_variables": {
+    "CALLERID_NUM": "2001",
+    "EXTEN": "1000"
+  }
+}
