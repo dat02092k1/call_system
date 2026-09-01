@@ -9,6 +9,7 @@ export type CallDetails = {
 type JoinFormProps = {
   onJoin: (details: CallDetails) => Promise<void> | void;
   onAsteriskCall: (details: CallDetails) => Promise<void> | void;
+  onRealAsteriskCall: (details: CallDetails) => Promise<void> | void;
   busy: boolean;
   error: string;
 };
@@ -16,6 +17,7 @@ type JoinFormProps = {
 export function JoinForm({
   onJoin,
   onAsteriskCall,
+  onRealAsteriskCall,
   busy,
   error,
 }: JoinFormProps) {
@@ -48,6 +50,11 @@ export function JoinForm({
   async function callAsterisk() {
     const details = callDetails();
     if (details) await onAsteriskCall(details);
+  }
+
+  async function callRealAsterisk() {
+    const details = callDetails();
+    if (details) await onRealAsteriskCall(details);
   }
 
   return (
@@ -97,6 +104,14 @@ export function JoinForm({
               onClick={callAsterisk}
             >
               Gọi qua Asterisk Mock
+            </button>
+            <button
+              className="secondary-button real-asterisk-button"
+              disabled={busy}
+              type="button"
+              onClick={callRealAsterisk}
+            >
+              {"G\u1ecdi qua Asterisk th\u1eadt"}
             </button>
           </div>
         </form>

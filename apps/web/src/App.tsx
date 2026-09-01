@@ -6,10 +6,12 @@ import {
 } from "./components/JoinForm";
 import { CallRoom } from "./components/CallRoom";
 import { AsteriskCall } from "./components/AsteriskCall";
+import { RealAsteriskCall } from "./components/RealAsteriskCall";
 
 export function App() {
   const [session, setSession] = useState<TokenResponse | null>(null);
   const [asteriskCaller, setAsteriskCaller] = useState<string | null>(null);
+  const [realAsteriskCaller, setRealAsteriskCaller] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -51,12 +53,25 @@ export function App() {
     );
   }
 
+  if (realAsteriskCaller) {
+    return (
+      <RealAsteriskCall
+        displayName={realAsteriskCaller}
+        onLeave={() => setRealAsteriskCaller(null)}
+      />
+    );
+  }
+
   return (
     <JoinForm
       onJoin={join}
       onAsteriskCall={(details) => {
         setError("");
         setAsteriskCaller(details.displayName);
+      }}
+      onRealAsteriskCall={(details) => {
+        setError("");
+        setRealAsteriskCaller(details.displayName);
       }}
       busy={busy}
       error={error}

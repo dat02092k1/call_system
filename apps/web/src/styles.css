@@ -106,7 +106,7 @@ input[aria-invalid="true"] { border-color: #d71920; }
   transition: transform .18s, background .18s;
 }
 .primary-button:hover:not(:disabled) { background: #c9151c; transform: translateY(-1px); }
-.call-mode-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.call-mode-buttons { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .call-mode-buttons .primary-button { margin-top: 6px; }
 .secondary-button {
   margin-top: 6px;
@@ -335,6 +335,10 @@ input[aria-invalid="true"] { border-color: #d71920; }
   .join-card { min-height: 100vh; }
   .room-heading { align-items: start; flex-direction: column; margin-top: 60px; }
   .room-status { text-align: left; }
+}
+
+@media (min-width: 521px) and (max-width: 900px) {
+  .call-mode-buttons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 520px) {
