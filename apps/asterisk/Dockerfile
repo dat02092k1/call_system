@@ -16,7 +16,8 @@ RUN ./configure --with-jansson-bundled --with-pjproject-bundled \
     && make menuselect.makeopts \
     && menuselect/menuselect --disable BUILD_NATIVE menuselect.makeopts \
     && make -j"$(nproc)" \
-    && make DESTDIR=/opt/asterisk-root install
+    && make DESTDIR=/opt/asterisk-root install \
+    && rm -rf /opt/asterisk-root/var/run
 
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
