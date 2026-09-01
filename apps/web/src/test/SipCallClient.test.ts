@@ -110,6 +110,51 @@ describe("SipCallClient", () => {
 
     expect(states.at(-1)).toEqual({ status: "ended" });
   });
+
+  it("reports an unexpected errorless server disconnect as failed", async () => {
+    const { client, states, options } = harness();
+    await client.start("Nguyen Van A");
+
+    options().delegate.onServerDisconnect?.();
+
+    expect(states.at(-1)).toEqual({
+      status: "failed",
+      message: "Không thể kết nối cuộc gọi qua Asterisk.",
+    });
+  });
+
+  it("continues stalled cleanup and detaches media", async () => {
+    vi.useFakeTimers();
+    try {
+      const { client, user, remoteAudio, pause, states } = harness();
+      vi.mocked(user.hangup).mockImplementation(
+        () => new Promise<void>(() => undefined),
+      );
+
+      await client.start("Nguyen Van A");
+      void client.hangup();
+      await vi.advanceTimersByTimeAsync(15_000);
+      await vi.runAllTimersAsync();
+
+      expect(user.unregister).toHaveBeenCalledOnce();
+      expect(user.disconnect).toHaveBeenCalledOnce();
+      expect(pause).toHaveBeenCalledOnce();
+      expect(remoteAudio.srcObject).toBeNull();
+      expect(states.at(-1)).toEqual({ status: "ended" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("ignores a late answer callback after hangup", async () => {
+    const { client, states, options } = harness();
+    await client.start("Nguyen Van A");
+    await client.hangup();
+
+    options().delegate.onCallAnswered?.();
+
+    expect(states.at(-1)).toEqual({ status: "ended" });
+  });
 });
 
 describe("readSipCallConfig", () => {

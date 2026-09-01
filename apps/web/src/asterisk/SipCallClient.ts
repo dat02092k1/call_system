@@ -55,16 +55,17 @@ export class SipCallClient {
     const options: SipUserOptions = {
       aor: `sip:${this.config.extension}@${this.config.domain}`,
       delegate: {
-        onCallAnswered: () => this.setState({ status: "active" }),
+        onCallAnswered: () => {
+          if (this.intentionallyDisconnected || this.isTerminal()) return;
+          this.setState({ status: "active" });
+        },
         onCallHangup: () => void this.hangup(),
         onServerDisconnect: (error) => {
           if (this.intentionallyDisconnected || this.state.status === "failed") return;
-          if (error) {
-            this.setState({
-              status: "failed",
-              message: failureMessage(error, this.config.extension),
-            });
-          }
+          this.setState({
+            status: "failed",
+            message: failureMessage(error, this.config.extension),
+          });
         },
       },
       media: {
@@ -106,13 +107,17 @@ export class SipCallClient {
     this.onStateChange(state);
   }
 
+  private isTerminal(): boolean {
+    return this.state.status === "ended" || this.state.status === "failed";
+  }
+
   private async cleanup(reportEnded: boolean): Promise<void> {
     const user = this.user;
     this.user = undefined;
     if (user) {
-      await user.hangup().catch(() => undefined);
-      await user.unregister().catch(() => undefined);
-      await user.disconnect().catch(() => undefined);
+      await withTimeout(user.hangup(), this.config.timeoutMs).catch(() => undefined);
+      await withTimeout(user.unregister(), this.config.timeoutMs).catch(() => undefined);
+      await withTimeout(user.disconnect(), this.config.timeoutMs).catch(() => undefined);
     }
     this.remoteAudio.pause();
     this.remoteAudio.srcObject = null;
