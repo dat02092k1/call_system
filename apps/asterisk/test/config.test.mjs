@@ -38,15 +38,15 @@ test("routes extension 1000 to native JSON slin16 media", async () => {
     /Dial\(WebSocket\/voicebridge\/c\(slin16\)f\(json\),60\)/,
   );
   const callerNumber = extensions.indexOf(
-    "Set(CALLER_NUMBER=${CALLERID(num)})",
+    "Set(_CALLER_NUMBER=${CALLERID(num)})",
   );
-  const callerName = extensions.indexOf("Set(CALLER_NAME=${CALLERID(name)})");
+  const callerName = extensions.indexOf("Set(_CALLER_NAME=${CALLERID(name)})");
   const dial = extensions.indexOf(
     "Dial(WebSocket/voicebridge/c(slin16)f(json),60)",
   );
   assert.ok(
     callerNumber >= 0 && callerName > callerNumber && dial > callerName,
-    "expected caller number and name metadata before Dial",
+    "expected inheritable caller number and name metadata before Dial",
   );
   assert.match(client, /uri=ws:\/\/127\.0\.0\.1:8091\/media/);
   assert.match(client, /connection_type=per_call_config/);
@@ -61,6 +61,7 @@ test("loads every runtime module required by the call path", async () => {
     "res_http_websocket.so",
     "res_pjsip_transport_websocket.so",
     "res_crypto.so",
+    "res_srtp.so",
     "chan_websocket.so",
   ]) {
     assert.match(modules, new RegExp(`load => ${name.replace(".", "\\.")}`));

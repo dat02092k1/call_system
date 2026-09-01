@@ -41,6 +41,17 @@ test("removes staged runtime state after install and before Debian copy", () => 
   assertEffectiveRuntimeCopyOrdering(dockerfile);
 });
 
+test("installs SRTP dependencies in build and runtime images", () => {
+  assert.match(
+    dockerfile,
+    /libssl-dev libxml2-dev libncurses-dev libsrtp2-dev uuid-dev/,
+  );
+  assert.match(
+    dockerfile,
+    /libssl3 libxml2 libncurses6 libsrtp2-1 libuuid1/,
+  );
+});
+
 test("rejects cleanup before staged install", () => {
   const cleanupBeforeInstall = dockerfile.replace(
     `${installCommand}\n${cleanupCommand}`,
@@ -61,7 +72,7 @@ test("rejects cleanup before staged install", () => {
 });
 
 test(
-  "healthcheck queries the WebSocket transport and crypto modules",
+  "healthcheck queries the WebSocket transport, crypto, and SRTP modules",
   { skip: process.platform !== "linux" },
   async () => {
     const directory = await mkdtemp(join(tmpdir(), "asterisk-healthcheck-"));
@@ -94,6 +105,7 @@ esac
         /-rx module show like res_pjsip_transport_websocket\.so/,
       );
       assert.match(invocations, /-rx module show like res_crypto\.so/);
+      assert.match(invocations, /-rx module show like res_srtp\.so/);
     } finally {
       await rm(directory, { recursive: true, force: true });
     }

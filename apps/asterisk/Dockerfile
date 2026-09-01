@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential ca-certificates curl file git pkg-config python3 \
     libcurl4-openssl-dev libedit-dev libjansson-dev libnewt-dev \
-    libsqlite3-dev libssl-dev libxml2-dev libncurses-dev uuid-dev \
+    libsqlite3-dev libssl-dev libxml2-dev libncurses-dev libsrtp2-dev uuid-dev \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /src
 RUN curl -fsSLO "https://downloads.asterisk.org/pub/telephony/asterisk/releases/asterisk-${ASTERISK_VERSION}.tar.gz" \
@@ -22,7 +22,7 @@ RUN ./configure --with-jansson-bundled --with-pjproject-bundled \
 FROM debian:bookworm-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl libcurl4 libedit2 libjansson4 libsqlite3-0 \
-    libssl3 libxml2 libncurses6 libuuid1 \
+    libssl3 libxml2 libncurses6 libsrtp2-1 libuuid1 \
     && groupadd --system asterisk \
     && useradd --system --gid asterisk --home-dir /var/lib/asterisk asterisk \
     && rm -rf /var/lib/apt/lists/*
