@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it, vi } from "vitest";
 import type { VoiceBridgeConfig } from "../src/config.js";
 import {
@@ -6,7 +7,7 @@ import {
   type RtcCallAdapter,
   type RtcConnectInput,
 } from "../src/livekitSession.js";
-import type { MediaStartEvent } from "../src/protocol.js";
+import { parseMediaControl, type MediaStartEvent } from "../src/protocol.js";
 
 const config: VoiceBridgeConfig = {
   livekitUrl: "ws://livekit:7880",
@@ -106,6 +107,35 @@ describe("startCancellableStreamReader", () => {
 });
 
 describe("LiveKitCallSession", () => {
+  it("carries real Asterisk caller variables into LiveKit metadata", async () => {
+    const payload = await readFile(
+      new URL("./fixtures/asterisk-media-start.json", import.meta.url),
+      "utf8",
+    );
+    const nativeStart = parseMediaControl(payload);
+    if (nativeStart.event !== "MEDIA_START") {
+      throw new Error("fixture must be a MEDIA_START event");
+    }
+    const rtc = new FakeRtcAdapter();
+    const session = new LiveKitCallSession({
+      start: nativeStart,
+      config,
+      rtc,
+      sendAsteriskAudio: vi.fn(),
+    });
+
+    await session.start();
+
+    expect(rtc.connectInputs[0]).toMatchObject({
+      participantName: "Nguyen Van A",
+      attributes: {
+        "telephony.provider": "asterisk",
+        "telephony.phoneNumber": "2001",
+      },
+    });
+    await session.close("test-complete");
+  });
+
   it("joins a deterministic room with telephony metadata", async () => {
     const rtc = new FakeRtcAdapter();
     const session = new LiveKitCallSession({

@@ -20,8 +20,8 @@ describe("Asterisk media protocol", () => {
       optimalFrameSize: 640,
       ptime: 20,
       channelVariables: {
-        CALLERID_NUM: "2001",
-        EXTEN: "1000",
+        CALLER_NUMBER: "2001",
+        CALLER_NAME: "Nguyen Van A",
       },
     });
   });

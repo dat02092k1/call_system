@@ -51,7 +51,7 @@ Hai gateway SIP là độc lập: Asterisk `22.11.0` được build từ source 
 
 Yêu cầu Windows 10/11, PowerShell, Docker Desktop với Docker Compose v2. Trong Docker Desktop, bật **Settings → Resources → Network → Enable host networking**. Trình duyệt phải được cấp quyền microphone.
 
-Trước khi chạy, các cổng sau phải đang rảnh: `5060`, `5070`, `7880-7882`, `8088`, `8090`, `8091`, `10000-10100/udp`, `12000-12100/udp`.
+Trước khi chạy, các cổng host sau phải đang rảnh: TCP `3001`, `3002`, `5060`, `5070`, `5173`, `6379`, `7880-7881`, `8081-8082`, `8088`, `8090-8091`; UDP `5060`, `5070`, `7882`, `10000-10100`, `12000-12100`.
 
 Tại thư mục gốc repository:
 
@@ -92,18 +92,19 @@ Tạo tài khoản MicroSIP và đăng ký với Asterisk:
 | Trường | Giá trị |
 |---|---|
 | SIP server/domain | `127.0.0.1` |
-| Port | `5060` |
+| SIP server port (đích) | `5060` |
+| Local/source port | `Automatic` hoặc một cổng UDP đang rảnh |
 | Username/login | `2002` |
 | Password | `demo2002` |
 | Transport | `UDP` |
 | Media encryption | `Disabled` (chỉ demo local) |
 | Enabled codecs | `G.711 u-law` và `G.711 A-law` |
 
-Sau khi registration thành công, gọi số `1000`. Asterisk xác thực `2002`, thương lượng G.711 với MicroSIP, rồi chuyển đổi và route media `slin16` đến Voice Bridge.
+`5060` là cổng đích của Asterisk. Để MicroSIP tự chọn local/source port (`Automatic`/random) hoặc chọn một cổng UDP đang rảnh; không đặt local/source port cố định là `5060`, vì Asterisk đã dùng cổng host đó. Sau khi registration thành công, gọi số `1000`. Asterisk xác thực `2002`, thương lượng G.711 với MicroSIP, rồi chuyển đổi và route media `slin16` đến Voice Bridge.
 
 Không nhầm đường này với LiveKit SIP vẫn được giữ nguyên: direct call vào LiveKit SIP là `1000@127.0.0.1:5070`, không đăng ký extension và không dùng `5060`. LiveKit SIP không hỗ trợ `SIP REGISTER`.
 
-## Các luồng cũ vẫn hoạt động
+## Các luồng cũ được giữ nguyên
 
 - **WebRTC trực tiếp:** mở web, nhập tên, chọn `Gọi trực tiếp WebRTC`, cho phép microphone rồi hội thoại với bot.
 - **Asterisk Mock:** chọn `Gọi qua Asterisk Mock`; browser gửi PCM16 đến `ws://localhost:8090/call`, sau đó Mock chuyển media đến Voice Bridge.

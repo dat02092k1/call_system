@@ -7,7 +7,7 @@
   "optimal_frame_size": 640,
   "ptime": 20,
   "channel_variables": {
-    "CALLERID_NUM": "2001",
-    "EXTEN": "1000"
+    "CALLER_NUMBER": "2001",
+    "CALLER_NAME": "Nguyen Van A"
   }
 }

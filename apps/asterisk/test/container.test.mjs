@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
 
 const dockerfile = await readFile(
   new URL("../Dockerfile", import.meta.url),
@@ -53,3 +59,43 @@ test("rejects cleanup before staged install", () => {
     /expected staged install before exact \/var\/run cleanup before runtime root copy/,
   );
 });
+
+test(
+  "healthcheck queries the WebSocket transport and crypto modules",
+  { skip: process.platform !== "linux" },
+  async () => {
+    const directory = await mkdtemp(join(tmpdir(), "asterisk-healthcheck-"));
+    const fakeAsterisk = join(directory, "asterisk");
+    const calls = join(directory, "calls.log");
+    const healthcheck = new URL("../scripts/healthcheck.sh", import.meta.url);
+    await writeFile(
+      fakeAsterisk,
+      `#!/bin/sh
+printf '%s\\n' "$*" >> "$ASTERISK_CALL_LOG"
+case "$*" in
+  *"module show like"*) printf '%s\\n' "module Running" ;;
+  *"http show status"*) printf '%s\\n' "Enabled and Bound" ;;
+esac
+`,
+      { mode: 0o755 },
+    );
+
+    try {
+      await execFileAsync("sh", [healthcheck.pathname], {
+        env: {
+          ...process.env,
+          ASTERISK_CALL_LOG: calls,
+          PATH: `${directory}:${process.env.PATH}`,
+        },
+      });
+      const invocations = await readFile(calls, "utf8");
+      assert.match(
+        invocations,
+        /-rx module show like res_pjsip_transport_websocket\.so/,
+      );
+      assert.match(invocations, /-rx module show like res_crypto\.so/);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  },
+);

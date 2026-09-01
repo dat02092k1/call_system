@@ -19,6 +19,7 @@ export type SipUserDelegate = {
   onCallAnswered?: () => void;
   onCallHangup?: () => void;
   onRegistered?: () => void;
+  onUnregistered?: () => void;
   onServerDisconnect?: (error?: Error) => void;
 };
 
