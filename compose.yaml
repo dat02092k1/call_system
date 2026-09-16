@@ -107,7 +107,7 @@ services:
 
   agent:
     build:
-      context: ./apps/agent
+      context: ./apps/agent-py
     environment:
       LIVEKIT_URL: ws://livekit:7880
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:-devkey}
@@ -125,9 +125,9 @@ services:
       test:
         [
           "CMD",
-          "node",
-          "-e",
-          "fetch('http://localhost:8081').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          "python",
+          "-c",
+          "import sys, urllib.request; r=urllib.request.urlopen('http://localhost:8081', timeout=2); sys.exit(0 if 200 <= r.status < 300 else 1)",
         ]
       interval: 5s
       timeout: 3s
