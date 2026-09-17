@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createCallOrchestratorClient,
   prepareInboundCallContext,
+  resolveInboundCallIdentity,
 } from "../src/orchestrator.js";
 
 describe("transfer target client", () => {
@@ -47,6 +48,50 @@ describe("transfer target client", () => {
 });
 
 describe("call orchestrator client", () => {
+  it("uses Asterisk bridge metadata when SIP attributes are absent", () => {
+    expect(
+      resolveInboundCallIdentity({
+        identity: "caller-bridge-1",
+        attributes: {
+          "telephony.callId": "bridge-1",
+          "telephony.phoneNumber": "0900000001",
+        },
+      }),
+    ).toEqual({
+      callId: "bridge-1",
+      phoneNumber: "0900000001",
+    });
+  });
+
+  it("keeps SIP metadata precedence over bridge attributes", () => {
+    expect(
+      resolveInboundCallIdentity({
+        identity: "caller",
+        attributes: {
+          "sip.callID": "sip-1",
+          "sip.phoneNumber": "0911111111",
+          "telephony.callId": "bridge-1",
+          "telephony.phoneNumber": "0900000001",
+        },
+      }),
+    ).toEqual({
+      callId: "sip-1",
+      phoneNumber: "0911111111",
+    });
+  });
+
+  it("falls back to participant identity for non-telephony callers", () => {
+    expect(
+      resolveInboundCallIdentity({
+        identity: "browser-user",
+        attributes: {},
+      }),
+    ).toEqual({
+      callId: "call-browser-user",
+      phoneNumber: "browser-user",
+    });
+  });
+
   it("posts SIP call information and returns customer context", async () => {
     const fetchImplementation = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ nameCustomer: "Nguyễn Văn A" }), {
