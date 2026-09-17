@@ -110,7 +110,7 @@ Không nhầm đường này với LiveKit SIP vẫn được giữ nguyên: dir
 - **Asterisk Mock:** chọn `Gọi qua Asterisk Mock`; browser gửi PCM16 đến `ws://localhost:8090/call`, sau đó Mock chuyển media đến Voice Bridge.
 - **LiveKit SIP trực tiếp:** softphone gọi `1000@127.0.0.1:5070`; dùng local account/direct IP call, không username/password/REGISTER. Trên Windows chọn transport TCP cho luồng direct này nếu softphone yêu cầu; RTP vẫn UDP.
 
-`transfer_to_agent` chỉ là tính năng của luồng LiveKit SIP trực tiếp. Không coi transfer là tính năng hỗ trợ cho cuộc gọi bắt nguồn từ Asterisk (browser SIP.js, MicroSIP hay Asterisk Mock).
+`transfer_call` chỉ là tính năng của luồng LiveKit SIP trực tiếp. Không coi transfer là tính năng hỗ trợ cho cuộc gọi bắt nguồn từ Asterisk (browser SIP.js, MicroSIP hay Asterisk Mock).
 
 ## Xác minh và xử lý sự cố
 
@@ -150,7 +150,7 @@ Egress ghi audio room thành MP3 vào `./recordings/{room-name}-{timestamp}.mp3`
 Get-ChildItem .\recordings\*.mp3
 ```
 
-Nếu cần thử cold transfer, chỉ dùng luồng LiveKit SIP direct (`1000@127.0.0.1:5070`). Agent yêu cầu xác nhận trước khi gọi `transfer_to_agent`; đích transfer do Call Orchestrator chọn, LLM không tự tạo SIP URI.
+Nếu cần thử cold transfer, chỉ dùng luồng LiveKit SIP direct (`1000@127.0.0.1:5070`). Agent yêu cầu xác nhận trước khi gọi `transfer_call`; đích transfer do Call Orchestrator chọn, LLM không tự tạo SIP URI.
 
 ## Lệnh vận hành và test
 
@@ -164,7 +164,7 @@ docker compose down
 ```powershell
 docker run --rm -v "${PWD}:/workspace" -w /workspace/apps/token-api node:22-alpine sh -c "npm test && npm run typecheck"
 docker run --rm -v "${PWD}:/workspace" -w /workspace/apps/web node:22-alpine sh -c "npm test && npm run typecheck && npm run build"
-docker run --rm -v "${PWD}:/workspace" -w /workspace/apps/agent node:22-bookworm-slim sh -c "npm test && npm run typecheck && npm run build"
+docker run --rm -v "${PWD}:/workspace" -w /workspace/apps/agent-py python:3.12-slim sh -c "pip install -q -r requirements.txt && python test_transfer.py"
 docker run --rm -v "${PWD}:/workspace" -w /workspace/apps/call-orchestrator node:22-alpine npm test
 docker run --rm -v "${PWD}:/workspace" -v /workspace/apps/voice-bridge/node_modules -w /workspace/apps/voice-bridge node:22-bookworm-slim sh -c "npm ci && npm test && npm run typecheck && npm run build"
 docker run --rm -v "${PWD}:/workspace" -v /workspace/apps/mock-asterisk/node_modules -w /workspace/apps/mock-asterisk node:22-alpine sh -c "npm ci && npm test && npm run typecheck && npm run build"
